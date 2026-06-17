@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: autocard-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: autocard
+      MYSQL_USER: autocard
+      MYSQL_PASSWORD: autocard123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: autocard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: autocard-backend
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: mysql://autocard:autocard123@mysql:3306/autocard
+      JWT_SECRET: your-jwt-secret-change-in-production
+      CARD_ENCRYPT_KEY: your-32-byte-card-encryption-key!
+      SMTP_HOST: ""
+      SMTP_PORT: "465"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      PORT: "3000"
+      NODE_ENV: production
+      CORS_ORIGIN: "*"
+    depends_on:
+      - mysql
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: autocard-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: autocard-admin
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  redis_data:

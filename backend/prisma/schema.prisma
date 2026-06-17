@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id            Int       @id @default(autoincrement())
+  username      String    @unique
+  password      String
+  nickname      String?
+  avatar        String?
+  email         String?
+  role          String    @default("admin")
+  status        Int       @default(1)
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  icon      String?
+  sort      Int       @default(0)
+  status    Int       @default(1)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id          Int           @id @default(autoincrement())
+  categoryId  Int
+  name        String
+  subtitle    String?
+  cover       String?
+  description String?
+  minPrice    Float         @default(0)
+  maxPrice    Float         @default(0)
+  totalSold   Int           @default(0)
+  viewCount   Int           @default(0)
+  status      Int           @default(1)
+  sort        Int           @default(0)
+  isHot       Int           @default(0)
+  isNew       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  category    Category      @relation(fields: [categoryId], references: [id])
+  specs       ProductSpec[]
+  cards       Card[]
+  orderItems  OrderItem[]
+}
+
+model ProductSpec {
+  id            Int         @id @default(autoincrement())
+  productId     Int
+  name          String
+  price         Float
+  originalPrice Float?
+  stock         Int         @default(0)
+  sold          Int         @default(0)
+  sort          Int         @default(0)
+  createdAt     DateTime    @default(now())
+  product       Product     @relation(fields: [productId], references: [id])
+  cards         Card[]
+  orderItems    OrderItem[]
+}
+
+model Card {
+  id         Int         @id @default(autoincrement())
+  productId  Int
+  specId     Int
+  content    String
+  status     Int         @default(1)
+  orderId    Int?
+  soldAt     DateTime?
+  createdAt  DateTime    @default(now())
+  product    Product     @relation(fields: [productId], references: [id])
+  spec       ProductSpec @relation(fields: [specId], references: [id])
+  order      Order?      @relation(fields: [orderId], references: [id])
+}
+
+model Order {
+  id                Int         @id @default(autoincrement())
+  orderNo           String      @unique
+  orderToken        String?     @unique
+  buyerEmail        String
+  totalAmount       Float
+  payAmount         Float
+  couponId          Int?
+  discountAmount    Float       @default(0)
+  paymentMethod     String?
+  paymentTradeNo    String?
+  status            Int         @default(0)
+  paidAt            DateTime?
+  deliveredAt       DateTime?
+  expiredAt         DateTime
+  buyerIp           String?
+  buyerUa           String?
+  useExtractPassword Int        @default(0)
+  extractPassword   String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  items             OrderItem[]
+  cards             Card[]
+}
+
+model OrderItem {
+  id          Int         @id @default(autoincrement())
+  orderId     Int
+  productId   Int
+  specId      Int
+  productName String
+  specName    String
+  price       Float
+  quantity    Int         @default(1)
+  subtotal    Float
+  order       Order       @relation(fields: [orderId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+  spec        ProductSpec @relation(fields: [specId], references: [id])
+}
+
+model Coupon {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  type        Int
+  value       Float
+  minAmount   Float    @default(0)
+  totalQuota  Int
+  usedQuota   Int      @default(0)
+  expiresAt   DateTime
+  status      Int      @default(1)
+}
+
+model Setting {
+  k           String  @id
+  v           String
+  description String?
+}
