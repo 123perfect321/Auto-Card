@@ -153,15 +153,34 @@ export async function getOrderStatus(orderNo: string) {
 }
 
 export async function getOrderStatusByToken(token: string) {
-  const order = await prisma.order.findUnique({ where: { orderToken: token } });
+  const order = await prisma.order.findUnique({
+    where: { orderToken: token },
+    include: {
+      items: {
+        select: {
+          quantity: true,
+          price: true,
+          product: { select: { name: true } },
+          spec: { select: { name: true } },
+        },
+      },
+    },
+  });
   if (!order) throw new Error('订单不存在');
 
+  const subject = order.items.map(i => `${i.product.name}（${i.spec.name}）×${i.quantity}`).join('、');
+
   return {
+    order_no: order.orderNo,
+    token: order.orderToken,
     status: order.status,
     pay_amount: Number(order.payAmount),
     paid_at: order.paidAt,
     delivered_at: order.deliveredAt,
     use_extract_password: order.useExtractPassword,
+    payment_method: order.paymentMethod,
+    buyer_email: order.buyerEmail,
+    subject,
   };
 }
 
@@ -327,6 +346,46 @@ export async function simulatePaymentByToken(token: string) {
 
   logger.info(`Payment simulated: ${order.orderNo}`, { cards: cards.length });
   return { cards, delivered: cards.length > 0 };
+}
+
+export async function fulfillOrderByToken(token: string, tradeNo: string) {
+  const order = await prisma.order.findUnique({
+    where: { orderToken: token },
+    include: { items: true },
+  });
+
+  if (!order) return { delivered: false, reason: 'order_not_found', orderToken: token };
+  if (order.status >= 1) return { delivered: true, reason: 'already_paid', orderToken: token };
+  if (order.expiredAt < new Date()) return { delivered: false, reason: 'order_expired', orderToken: token };
+
+  await prisma.order.update({
+    where: { orderToken: token },
+    data: {
+      status: 1,
+      paidAt: new Date(),
+      paymentTradeNo: tradeNo || `SIM${Date.now()}`,
+      paymentMethod: order.paymentMethod || 'epay',
+    },
+  });
+
+  const cards: string[] = [];
+  for (const item of order.items) {
+    for (let i = 0; i < item.quantity; i++) {
+      const card = await assignCard(item.productId, item.specId, order.id);
+      if (card) cards.push(card);
+    }
+  }
+
+  if (cards.length > 0) {
+    await prisma.order.update({
+      where: { orderToken: token },
+      data: { status: 2, deliveredAt: new Date() },
+    });
+    await sendCardEmail(order.buyerEmail, order.orderNo, cards);
+  }
+
+  logger.info(`Order fulfilled via gateway: ${order.orderNo}`, { tradeNo, cards: cards.length });
+  return { orderNo: order.orderNo, orderToken: token, cards: cards.length, delivered: cards.length > 0 };
 }
 
 export async function getAdminOrderList(params: any) {

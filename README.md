@@ -185,6 +185,54 @@ docker-compose up -d
 
 ---
 
+## 💳 配置支付（易支付）
+
+当前接入的是「易支付」聚合网关（统一支持支付宝 / 微信 / QQ / USDT），不需要分别对接多个官方商户号。
+
+### 1. 申请易支付商户
+
+去任一易支付平台（如 pay.razor、epay.pm、anpay 等）注册商户，获得三个字段：
+
+| 字段 | 来源 |
+|------|------|
+| 商户 PID | 易支付后台「商户信息」 |
+| 商户密钥 (key) | 易支付后台「密钥管理」 |
+| 网关地址 | 平台给的支付网关 URL（例如 `https://pay.example.com`） |
+
+### 2. 填入后台配置
+
+登录管理后台 → **系统设置 → 支付配置**：
+
+1. 在「易支付」区块填写 `商户 PID` / `商户密钥` / `网关地址`
+2. 点击「测试网关连通」看是否返回 ✓
+3. 把页面上显示的两条回调地址填到易支付后台：
+   - 异步通知 URL → `${SITE_URL}/api/payments/notify`
+   - 同步回跳 URL → `${SITE_URL}/api/payments/return`
+4. 保存设置
+
+### 3. 配置站点公网地址
+
+后端 `.env` 里的 `SITE_URL` 决定回调 URL 的前缀，本地调试可保持 `http://localhost:3000`，**生产必须换成公网地址**（如 `https://card.example.com`）。
+
+如果服务器在内网，可以用 ngrok / cloudflared 临时暴露：
+
+```bash
+ngrok http 3000   # 得到一个 https://xxxx.ngrok.io
+# 把 https://xxxx.ngrok.io 填入 .env 的 SITE_URL，重启后端
+```
+
+### 4. 买家支付流程
+
+1. 买家在商城下单 → 跳转 `/pay/:token`
+2. 页面自动调用 `/api/payments/create`，后端拼接易支付签名 URL
+3. 浏览器跳转到易支付网关收银台，买家扫码付款
+4. 易支付异步 POST 到 `/api/payments/notify` → 后端验签 → 标记订单已支付 → 自动分配卡密并发送邮件
+5. 买家浏览器从 `/api/payments/return` 重定向到 `/success/:token` 看到卡密
+
+> 商城首页右上角的「模拟支付」按钮仅用于本地调试（直接置订单为已支付），生产环境建议从前端移除或隐藏。
+
+---
+
 ## 📄 License
 
 MIT

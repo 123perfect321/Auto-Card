@@ -36,7 +36,14 @@ export function queryOrderByToken(token: string, extractPassword?: string) {
   return http.get('/orders/query-by-token', { params })
 }
 
-export function createPayment(data: { order_no: string; method: string; amount: number }) {
+export function createPayment(data: {
+  order_token: string;
+  order_no: string;
+  method: string;
+  amount: number;
+  subject: string;
+  email?: string;
+}) {
   return http.post('/payments/create', data)
 }
 

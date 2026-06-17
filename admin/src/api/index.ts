@@ -99,3 +99,7 @@ export function uploadFile(file: File) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+
+export function testPaymentConnection() {
+  return http.post('/payments/test', {})
+}
